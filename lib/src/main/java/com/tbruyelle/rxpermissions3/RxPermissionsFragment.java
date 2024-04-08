@@ -1,12 +1,16 @@
 package com.tbruyelle.rxpermissions3;
 
 import android.annotation.TargetApi;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
 
@@ -19,6 +23,13 @@ import io.reactivex.rxjava3.subjects.PublishSubject;
 public class RxPermissionsFragment extends Fragment {
 
     private static final int PERMISSIONS_REQUEST_CODE = 42;
+
+    private static final int SPECIAL_PERMISSION_REQUEST_CODE = 43;
+
+    private static final String PERMISSION_MANAGE_STORAGE = "android.permission.MANAGE_EXTERNAL_STORAGE";
+
+    public static final String MANAGE_APP_ALL_FILES_ACCESS_PERMISSION = "android.settings.MANAGE_APP_ALL_FILES_ACCESS_PERMISSION";
+
 
     // Contains all the current permission requests.
     // Once granted or denied, they are removed from it.
@@ -36,7 +47,28 @@ public class RxPermissionsFragment extends Fragment {
 
     @TargetApi(Build.VERSION_CODES.M)
     void requestPermissions(@NonNull String[] permissions) {
-        requestPermissions(permissions, PERMISSIONS_REQUEST_CODE);
+        if (permissions.length == 1 && PERMISSION_MANAGE_STORAGE.equals(permissions[0])) {
+            Intent intent = new Intent(MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
+            intent.setData(Uri.parse("package:" + getContext().getPackageName()));
+            startActivityForResult(intent, SPECIAL_PERMISSION_REQUEST_CODE);
+        } else {
+            requestPermissions(permissions, PERMISSIONS_REQUEST_CODE);
+        }
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == SPECIAL_PERMISSION_REQUEST_CODE) {
+            // Check if the special permission is granted after the user's action
+            boolean granted = isGranted(PERMISSION_MANAGE_STORAGE);
+            PublishSubject<Permission> subject = mSubjects.get(PERMISSION_MANAGE_STORAGE);
+            if (subject != null) {
+                mSubjects.remove(PERMISSION_MANAGE_STORAGE);
+                subject.onNext(new Permission(PERMISSION_MANAGE_STORAGE, granted, false));
+                subject.onComplete();
+            }
+        }
     }
 
     @TargetApi(Build.VERSION_CODES.M)
@@ -76,6 +108,9 @@ public class RxPermissionsFragment extends Fragment {
         final FragmentActivity fragmentActivity = getActivity();
         if (fragmentActivity == null) {
             throw new IllegalStateException("This fragment must be attached to an activity.");
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && PERMISSION_MANAGE_STORAGE.equals(permission)) {
+            return Environment.isExternalStorageManager();
         }
         return fragmentActivity.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED;
     }

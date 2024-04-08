@@ -39,7 +39,7 @@ public class MainActivity extends AppCompatActivity {
 
         disposable = RxView.clicks(findViewById(R.id.enableCamera))
                 // Ask for permissions when button is clicked
-                .compose(rxPermissions.ensureEach(permission.CAMERA))
+                .compose(rxPermissions.ensureEach(permission.MANAGE_EXTERNAL_STORAGE))
                 .subscribe(new Consumer<Permission>() {
                                @Override
                                public void accept(Permission permission) {
